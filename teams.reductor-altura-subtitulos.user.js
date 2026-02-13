@@ -18,16 +18,15 @@
     'use strict';
 
     const subtítulosTamaño = "20%";
+    const reducciónTamaño = () => {
+        const subtítulos = document.querySelector('[data-tid="closed-caption-renderer-wrapper"]');
+        if (subtítulos) {
+            subtítulos.style.height = subtítulosTamaño;
+            clearInterval(temporizador);
+        }
+    };
     /* Hacemos una comprobación cada segundo y medio hasta que se realice el cambio */
-    const temporizador = setInterval(
-        () => {
-            // document.querySelector('[data-tid="closed-caption-renderer-wrapper"]').style.height = "20%";
-            const subtítulos = document.querySelector('[data-tid="closed-caption-renderer-wrapper"]');
-            if (subtítulos) {
-                subtítulos.style.height = subtítulosTamaño;
-                clearInterval(temporizador);
-            }
-        },
-        1_500
-    );
+    const temporizador = setInterval(reducciónTamaño, 1_500);
+    /* De manera recurrente cambiamos el tamaño cada 30 segundos */
+    const temporizadorPermanente = setInterval(reducciónTamaño, 30_000);
 })();
