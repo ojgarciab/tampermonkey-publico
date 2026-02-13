@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Reductor de la altura de la barra de subtítulos de Teams
 // @namespace    https://github.com/ojgarciab
-// @version      0.2
+// @version      0.3
 // @description  try to take over the world!
 // @author       Óscar García
 // @match        https://teams.microsoft.com/v2/*
