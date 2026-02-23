@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Moodle: Marcar Unidades como Leídas
 // @namespace    http://tampermonkey.net/
-// @version      2026-02-23.fix6
+// @version      2026-02-23.fix7
 // @description  Añade un panel para marcar como leída la unidad actual del curso Moodle guardando en localStorage.
 // @author       Óscar García
 // @match        https://lms.haz.institutortve.com/course/view.php*
@@ -73,12 +73,13 @@
             );
             // Si nos llega un mensaje para cambiar el tiempo de la reproducción, lo procesamos
             window.addEventListener("message", (event) => {
+                console.log("Recibido mensaje:", );
                 const data = event.data;
-                if (data && data.type === "kaltura_seek") {
-                    const newPosition = Number(data.position);
-                    if (!isNaN(newPosition)) {
-                        console.log("[Hijo] Cambiando posición a:", newPosition);
-                        kalturaPlayer.currentTime(newPosition);
+                if (data && data.tipo === "reproductor_actual") {
+                    const posición = Math.round(data.posición);
+                    if (!isNaN(posición)) {
+                        console.log("[Hijo] Cambiando posición a:", posición);
+                        kalturaPlayer.currentTime = posición;
                     }
                 }
             });
@@ -278,6 +279,47 @@
             hr {
                 margin: 10px 0;
             }
+            /* --- Reproducción --- */
+            #rep-titulo {
+                margin-top: 12px;
+                font-size: 16px;
+            }
+            #rep-tiempo {
+                font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+                background: #f6f7f9;
+                border: 1px solid #e3e6ea;
+                border-radius: 4px;
+                padding: 6px 8px;
+            }
+            #rep-barra {
+                position: relative;
+                height: 8px;
+                background: #eee;
+                border-radius: 4px;
+                overflow: hidden;
+                margin-top: 8px;
+            }
+            #rep-progreso {
+                height: 100%;
+                width: 0%;
+                background: linear-gradient(90deg, #0a8a0a, #31b331);
+                transition: width .2s linear;
+            }
+            #rep-reanudar {
+                background: #0b5ed7;
+                color: white;
+                border: none;
+                padding: 8px 10px;
+                width: 100%;
+                cursor: pointer;
+                border-radius: 6px;
+                font-size: 14px;
+                margin-top: 10px;
+            }
+            #rep-reanudar:disabled {
+                opacity: .5;
+                cursor: not-allowed;
+            }
         `;
         document.head.appendChild(style);
 
@@ -301,6 +343,10 @@
             <button id="btn-marcar" class="${estadoLeido ? "" : "no"}">
                 ${estadoLeido ? "Marcar como NO leída" : "Marcar como leída"}
             </button>
+            <hr/>
+            <h3 id="rep-titulo">Reproducción</h3>
+            <div id="rep-tiempo">00:00 / 00:00 (0%)</div>
+            <div id="rep-barra"><div id="rep-progreso"></div></div>
         `;
         document.body.appendChild(panel);
         //document.getElementById("region-main").appendChild(panel);
@@ -312,8 +358,46 @@
 
         const btnMarcar = panel.querySelector("#btn-marcar");
         const estadoTexto = panel.querySelector("#estado-texto");
+
         // TODO: llamar a agregar/actualizar una representación del porcentaje de reproducción del vídeo (si hay datos almacenados)
         // TODO: esperar eventos del navegador para refrescar la representación cuando se navega por páginas o cambia de pestaña
+
+        // Claves de almacenamiento para reproducción (por actividad) impidiendo colisión con las claves por URL
+        const durKey = `~dur_${actividadId}`;
+        const posKey = `~pos_${actividadId}`;
+
+        // Elementos de UI de reproducción
+        const repTiempo = panel.querySelector("#rep-tiempo");
+        const repProgreso = panel.querySelector("#rep-progreso");
+
+        // Helpers de almacenamiento
+        const leerDuracion = () => parseInt(localStorage.getItem(durKey) || "0", 10);
+        const leerPosicion = () => parseInt(localStorage.getItem(posKey) || "0", 10);
+        const guardarDuracion = (total) => localStorage.setItem(durKey, String(Math.max(0, Math.round(total || 0))));
+        const guardarPosicion = (pos) => localStorage.setItem(posKey, String(Math.max(0, Math.round(pos || 0))));
+
+        // Refresca la representación del estado de reproducción en el panel
+        function refrescarReproduccion() {
+            const d = leerDuracion();
+            // Nunca muestres posición > duración
+            const p = Math.min(leerPosicion(), d || Number.MAX_SAFE_INTEGER);
+            const porcentaje = d > 0 ? Math.floor((p / d) * 100) : 0;
+
+            repTiempo.textContent = `${formatTime(p)} / ${formatTime(d)} (${porcentaje}%)`;
+            repProgreso.style.width = d > 0 ? `${Math.min(100, (p / d) * 100)}%` : "0%";
+        }
+
+        // Refresca UI si cambias de pestaña o navegas atrás (historial)
+        const onVisibilityOrPageShow = () => {
+            // Vuelve a leer localStorage y pinta
+            refrescarReproduccion();
+        };
+        document.addEventListener("visibilitychange", onVisibilityOrPageShow);
+        window.addEventListener("pageshow", onVisibilityOrPageShow);
+        window.addEventListener("popstate", onVisibilityOrPageShow);
+
+        // Pinta estado inicial
+        refrescarReproduccion();
 
         btnMarcar.addEventListener("click", () => {
             estadoLeido = !estadoLeido;
@@ -335,21 +419,35 @@
             // Salida prematura si no se entrega el tipo
             if (data.tipo === null) return;
             if (data.tipo === "reproductor_duracion") {
-                // TODO: Guardar en localStorage la duración total Math.round(data.duración)
-                // Actualizar los valores mostrados en el lateral de reproducción
-                // Como se supone que esto se recibe cuando carga la página del reproductor (antes de pulsar en reproducir)
-                // enviar de vuelta al marco hijo un mensaje con la posición almacenada de reproducción
+                console.log("Recibida duración:", data.duración);
+                // Guardar en localStorage la duración total
+                const total = Math.round(Number(data.duración) || 0);
+                if (total > 0) {
+                    guardarDuracion(total);
+                    refrescarReproduccion();
+                }
+
+                // Enviar al marco hijo la posición almacenada (para continuar donde lo dejó)
+                const pos = leerPosicion();
+                console.log("Enviando al hijo posición:", pos);
+                if (pos > 0) {
+                    event.source.postMessage({
+                        tipo: "reproductor_actual",
+                        posición: pos
+                    }, "*");
+                }
             } else if (data.tipo === "reproductor_actual") {
-                // TODO: Guardar en localStorage la posición de la reproducción Math.round(data.posición)
-                // TODO: Actualizar los valores mostrados en el lateral de reproducción
+                // Guardar posición actual y refrescar UI
+                const pos = Math.round(Number(data.posición) || 0);
+                guardarPosicion(pos);
+                refrescarReproduccion();
             }
         });
     }
 
-    const dosCifras = (n) => String(n).padStart(2, "0");
-
     // Damos formato al tiempo: formato mm:ss o hh:mm:ss
     function formatTime(seconds) {
+        const dosCifras = (n) => String(n).padStart(2, "0");
         if (isNaN(seconds) || seconds == null || seconds === 0) return "00:00";
         seconds = Math.max(0, Math.floor(seconds));
         const h = Math.floor(seconds / 3600);
