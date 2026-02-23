@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         Moodle: Marcar Unidades como Leídas
 // @namespace    http://tampermonkey.net/
-// @version      2026-02-23
+// @version      2026-02-23.fix1
 // @description  Añade un panel para marcar como leída la unidad actual del curso Moodle guardando en localStorage.
 // @author       Óscar García
 // @match        https://lms.haz.institutortve.com/course/view.php*
+// @match        https://lms.haz.institutortve.com/mod/page/view.php*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=institutortve.com
 // @homepageURL  https://ojgarciab.github.io/tampermonkey-publico/
 // @supportURL   https://github.com/ojgarciab/tampermonkey-publico/issues
