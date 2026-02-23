@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Moodle: Marcar Unidades como Leídas
 // @namespace    http://tampermonkey.net/
-// @version      2026-02-23.fix4
+// @version      2026-02-23.fix5
 // @description  Añade un panel para marcar como leída la unidad actual del curso Moodle guardando en localStorage.
 // @author       Óscar García
 // @match        https://lms.haz.institutortve.com/course/view.php*
@@ -144,6 +144,14 @@
         `;
         document.head.appendChild(styleListado);
 
+        // Si navegamos hacia atrás o cambiamos de pestaña forzamos una actualización
+        window.addEventListener("pageshow", dibujarListadoDeActividades);
+        document.addEventListener("visibilitychange", dibujarListadoDeActividades);
+        window.addEventListener("popstate", dibujarListadoDeActividades);
+        dibujarListadoDeActividades();
+    }
+
+    function dibujarListadoDeActividades() {
         // Obtener todas las actividades del curso
         const actividades = document.querySelectorAll("li.activity.activity-wrapper");
 
@@ -154,16 +162,23 @@
             const key = "moodleActividadLeida_" + id;
             const leida = localStorage.getItem(key) === "true";
 
-            // Crear icono
-            const icon = document.createElement("div");
-            icon.classList.add("estado-lectura-listado");
-            icon.classList.add(leida ? "estado-lectura-leido" : "estado-lectura-noleido");
-            icon.textContent = leida ? "✓" : "✘";
-
-            // Insertarlo dentro del recuadro de la actividad
+            // Dentro del contenedor donde posicionamos el icono
             const contenedor = act.querySelector(".activity-item");
+            if (!contenedor) return;
             contenedor.style.position = "relative";
-            contenedor.appendChild(icon);
+
+            // Buscamos si ya hay un icono; si no, lo creamos
+            let icon = contenedor.querySelector(".estado-lectura-listado");
+            if (!icon) {
+                icon = document.createElement("div");
+                icon.classList.add("estado-lectura-listado");
+                contenedor.appendChild(icon);
+            }
+
+            // Actualizamos clases y contenido (idempotente)
+            icon.classList.toggle("estado-lectura-leido", leida);
+            icon.classList.toggle("estado-lectura-noleido", !leida);
+            icon.textContent = leida ? "✓" : "✘";
         });
     }
 
