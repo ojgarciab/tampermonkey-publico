@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Moodle: Marcar Unidades como Leídas
 // @namespace    http://tampermonkey.net/
-// @version      2026-02-23.fix5
+// @version      2026-02-23.fix6
 // @description  Añade un panel para marcar como leída la unidad actual del curso Moodle guardando en localStorage.
 // @author       Óscar García
 // @match        https://lms.haz.institutortve.com/course/view.php*
@@ -63,7 +63,7 @@
                         : kalturaPlayer.duration || 0;
                         console.log("[Kaltura] Duración total (s):", total, "=>", formatTime(total));
                         window.parent.postMessage({
-                            type: "reproductor_duracion",
+                            tipo: "reproductor_duracion",
                             duración: total
                         }, "*");
                     } catch (err) {
@@ -82,6 +82,7 @@
                     }
                 }
             });
+            let tiempoAnterior = 0;
             // Cuando se actualiza el tiempo de reproducción lo comunicamos al marco padre
             kalturaPlayer.addEventListener(
                 kalturaPlayer.Event.TIME_UPDATE,
@@ -91,12 +92,16 @@
                         ? kalturaPlayer.currentTime()
                         : kalturaPlayer.currentTime || 0;
                         if (typeof now !== "number" || isNaN(now)) return;
-                        console.log("[Kaltura] Tiempo actual (s):", now, "=>", formatTime(now));
-                        // Enviamos el tiempo reproducido al padre
-                        window.parent.postMessage({
-                            type: "reproductor_actual",
-                            duración: now
-                        }, "*");
+                        // Enviamos el tiempo reproducido al padre, un máximo de una vez cada 2 segundos
+                        const redondeo = Math.floor(now / 2) * 2;
+                        if (redondeo != tiempoAnterior) {
+                            tiempoAnterior = redondeo;
+                            console.log("[Kaltura] Tiempo actual (s):", redondeo, "=>", formatTime(redondeo));
+                            window.parent.postMessage({
+                                tipo: "reproductor_actual",
+                                posición: redondeo
+                            }, "*");
+                        }
                     } catch (err) {
                         console.error("[Kaltura] Error en TIME_UPDATE:", err);
                     }
@@ -112,7 +117,7 @@
                         : kalturaPlayer.duration || 0;
                         console.log("[Kaltura] Duración (actualizada) (s):", total, "=>", formatTime(total));
                         window.parent.postMessage({
-                            type: "reproductor_duracion",
+                            tipo: "reproductor_duracion",
                             duración: total
                         }, "*");
                     } catch (err) {
@@ -191,9 +196,7 @@
         const storageKey = "moodleActividadLeida_" + actividadId;
         let estadoLeido = localStorage.getItem(storageKey) === "true";
 
-        /********************************************
-        * 2. Obtener información del breadcrumb
-        ********************************************/
+        //2 Obtener información del breadcrumb
         const breadcrumbItems = document.querySelectorAll("#page-navbar .breadcrumb-item");
 
         let nombreCurso = "";
@@ -309,6 +312,8 @@
 
         const btnMarcar = panel.querySelector("#btn-marcar");
         const estadoTexto = panel.querySelector("#estado-texto");
+        // TODO: llamar a agregar/actualizar una representación del porcentaje de reproducción del vídeo (si hay datos almacenados)
+        // TODO: esperar eventos del navegador para refrescar la representación cuando se navega por páginas o cambia de pestaña
 
         btnMarcar.addEventListener("click", () => {
             estadoLeido = !estadoLeido;
@@ -324,13 +329,28 @@
             btn.classList.toggle("leido");
             btn.classList.toggle("noleido");
         });
+
+        window.addEventListener("message", (event) => {
+            const data = event.data;
+            // Salida prematura si no se entrega el tipo
+            if (data.tipo === null) return;
+            if (data.tipo === "reproductor_duracion") {
+                // TODO: Guardar en localStorage la duración total Math.round(data.duración)
+                // Actualizar los valores mostrados en el lateral de reproducción
+                // Como se supone que esto se recibe cuando carga la página del reproductor (antes de pulsar en reproducir)
+                // enviar de vuelta al marco hijo un mensaje con la posición almacenada de reproducción
+            } else if (data.tipo === "reproductor_actual") {
+                // TODO: Guardar en localStorage la posición de la reproducción Math.round(data.posición)
+                // TODO: Actualizar los valores mostrados en el lateral de reproducción
+            }
+        });
     }
 
     const dosCifras = (n) => String(n).padStart(2, "0");
 
     // Damos formato al tiempo: formato mm:ss o hh:mm:ss
     function formatTime(seconds) {
-        if (isNaN(seconds) || seconds == null) return "00:00";
+        if (isNaN(seconds) || seconds == null || seconds === 0) return "00:00";
         seconds = Math.max(0, Math.floor(seconds));
         const h = Math.floor(seconds / 3600);
         const m = Math.floor((seconds % 3600) / 60);
