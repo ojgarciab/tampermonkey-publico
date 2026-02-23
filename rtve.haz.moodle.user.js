@@ -6,49 +6,83 @@
 // @author       Óscar García
 // @match        https://lms.haz.institutortve.com/course/view.php*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=institutortve.com
+// @homepageURL  https://ojgarciab.github.io/tampermonkey-publico/
+// @supportURL   https://github.com/ojgarciab/tampermonkey-publico/issues
+// @downloadURL  https://ojgarciab.github.io/tampermonkey-publico/rtve.haz.moodle.user.js
+// @updateURL    https://ojgarciab.github.io/tampermonkey-publico/rtve.haz.moodle.user.js
 // @grant        none
 // ==/UserScript==
 
-(function() {
+(function () {
     'use strict';
 
-    /*********************************
-     * 1. Identificar la unidad
-     *********************************/
-    const unidadId = window.location.pathname; // Usamos la URL completa como ID única
-    const storageKey = "moodleLeido_" + unidadId;
+    /********************************************
+     * 1. Obtener el ID de la actividad: ?id=1234
+     ********************************************/
+    const params = new URLSearchParams(window.location.search);
+    const actividadId = params.get("id");
+    if (!actividadId) return;
 
-    // Cargar estado
+    const storageKey = "moodleActividadLeida_" + actividadId;
     let estadoLeido = localStorage.getItem(storageKey) === "true";
 
-    /*********************************
-     * 2. Estilos básicos
-     *********************************/
+    /********************************************
+     * 2. Obtener información del breadcrumb
+     ********************************************/
+    const breadcrumbItems = document.querySelectorAll("#page-navbar .breadcrumb-item");
+
+    let nombreCurso = "";
+    let nombreUnidad = "";
+    let nombreActividad = document.title || window.location.pathname;
+
+    if (breadcrumbItems.length >= 1) {
+        nombreCurso = breadcrumbItems[0].innerText.trim();
+    }
+    if (breadcrumbItems.length >= 2) {
+        nombreUnidad = breadcrumbItems[1].innerText.trim();
+    }
+    if (breadcrumbItems.length >= 3) {
+        nombreActividad = breadcrumbItems[2].innerText.trim();
+    }
+
+    /********************************************
+     * 3. Estilos
+     ********************************************/
     const style = document.createElement("style");
     style.innerHTML = `
         #leido-btn {
             position: fixed;
             top: 20px;
             right: 20px;
-            background: #0055aa;
-            color: white;
             border-radius: 50%;
-            width: 50px;
-            height: 50px;
+            width: 55px;
+            height: 55px;
             cursor: pointer;
             border: none;
-            font-size: 22px;
+            font-size: 26px;
+            font-weight: bold;
             z-index: 99999;
-            box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+            box-shadow: 0 3px 8px rgba(0,0,0,0.30);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background 0.2s ease;
         }
+        #leido-btn.leido {
+            background: #0a8a0a; color: white;
+        }
+        #leido-btn.noleido {
+            background: #b00000; color: white;
+        }
+
         #panel-leido {
             position: fixed;
             top: 0;
             right: -260px;
             width: 250px;
             height: 100%;
-            background: white;
-            box-shadow: -3px 0 10px rgba(0,0,0,0.3);
+            background: #fff;
+            box-shadow: -3px 0 10px rgba(0,0,0,0.25);
             padding: 20px;
             transition: right 0.25s ease;
             z-index: 99998;
@@ -62,7 +96,7 @@
             margin-top: 0;
         }
         #btn-marcar {
-            background: #007700;
+            background: #0a8a0a;
             color: white;
             border: none;
             padding: 10px;
@@ -73,45 +107,51 @@
             margin-top: 15px;
         }
         #btn-marcar.no {
-            background: #aa0000;
+            background: #b00000;
+        }
+        hr {
+            margin: 10px 0;
         }
     `;
     document.head.appendChild(style);
 
-    /*********************************
-     * 3. Crear botón flotante
-     *********************************/
+    /********************************************
+     * 4. Botón flotante
+     ********************************************/
     const btn = document.createElement("button");
     btn.id = "leido-btn";
-    btn.innerHTML = "✓";
+    btn.classList.add(estadoLeido ? "leido" : "noleido");
+    btn.textContent = estadoLeido ? "✓" : "✘";
     document.body.appendChild(btn);
 
-    /*********************************
-     * 4. Crear panel lateral
-     *********************************/
+    /********************************************
+     * 5. Panel lateral
+     ********************************************/
     const panel = document.createElement("div");
     panel.id = "panel-leido";
     panel.innerHTML = `
-        <h2>Unidad actual</h2>
-        <p><strong>${unidadId}</strong></p>
+        <h2>Actividad actual</h2>
+        <p><strong>Curso:</strong><br>${nombreCurso}</p>
+        <p><strong>Unidad:</strong><br>${nombreUnidad}</p>
+        <p><strong>Actividad:</strong><br>${nombreActividad}</p>
+
         <hr>
+
         <p>Estado: <span id="estado-texto">${estadoLeido ? "Leída ✔" : "No leída ✘"}</span></p>
+
         <button id="btn-marcar" class="${estadoLeido ? "" : "no"}">
             ${estadoLeido ? "Marcar como NO leída" : "Marcar como leída"}
         </button>
     `;
     document.body.appendChild(panel);
 
-    /*********************************
-     * 5. Comportamiento
-     *********************************/
-
-    // Abrir/cerrar el panel
+    /********************************************
+     * 6. Lógica de interacción
+     ********************************************/
     btn.addEventListener("click", () => {
         panel.classList.toggle("open");
     });
 
-    // Marcar como leído
     const btnMarcar = panel.querySelector("#btn-marcar");
     const estadoTexto = panel.querySelector("#estado-texto");
 
@@ -119,9 +159,15 @@
         estadoLeido = !estadoLeido;
         localStorage.setItem(storageKey, estadoLeido);
 
+        // Panel
         estadoTexto.textContent = estadoLeido ? "Leída ✔" : "No leída ✘";
         btnMarcar.textContent = estadoLeido ? "Marcar como NO leída" : "Marcar como leída";
         btnMarcar.classList.toggle("no");
+
+        // Botón flotante
+        btn.textContent = estadoLeido ? "✓" : "✘";
+        btn.classList.toggle("leido");
+        btn.classList.toggle("noleido");
     });
 
 })();
