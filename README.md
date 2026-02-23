@@ -7,5 +7,7 @@ Este repositorio contiene [scripts de usuario](https://en.wikipedia.org/wiki/Use
   * [Steamgifts](https://ojgarciab.github.io/tampermonkey-publico/steamgifts.user.js).
 * Herramientas de Teams
   * [Reductor de altura de subtítulos](https://ojgarciab.github.io/tampermonkey-publico/teams.reductor-altura-subtitulos.user.js)
+* Herramientas para HAZ (Cursos RTVE)
+  * [Moodle: Marcar Unidades como Leídas](https://ojgarciab.github.io/tampermonkey-publico/rtve.haz.moodle.user.js)
 
 Estos scripts han sido desarrollados ajustándose a las normas de uso de las páginas relacionadas. En ningún caso realizan acciones automatizadas o de cualquier tipo que puedan dañar o afectar los servicios que prestan. Su objetivo es mejorar la funcionalidad de las mismas.
