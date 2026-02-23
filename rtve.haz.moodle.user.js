@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Moodle: Marcar Unidades como Leídas
 // @namespace    http://tampermonkey.net/
-// @version      2026-02-23.fix1
+// @version      2026-02-23.fix2
 // @description  Añade un panel para marcar como leída la unidad actual del curso Moodle guardando en localStorage.
 // @author       Óscar García
 // @match        https://lms.haz.institutortve.com/course/view.php*
@@ -16,6 +16,51 @@
 
 (function () {
     'use strict';
+
+    if (window.location.pathname.includes("/course/view.php")) {
+        const styleListado = document.createElement("style");
+        styleListado.innerHTML = `
+        .estado-lectura-listado {
+            position: absolute;
+            top: 5px;
+            right: 8px;
+            font-size: 200%;
+            font-weight: bold;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .estado-lectura-leido {
+            color: #0a8a0a;
+        }
+        .estado-lectura-noleido {
+            color: #b00000;
+        }
+        `;
+        document.head.appendChild(styleListado);
+
+        // Obtener todas las actividades del curso
+        const actividades = document.querySelectorAll("li.activity.activity-wrapper");
+
+        actividades.forEach(act => {
+            const id = act.getAttribute("data-id");
+            if (!id) return;
+
+            const key = "moodleActividadLeida_" + id;
+            const leida = localStorage.getItem(key) === "true";
+
+            // Crear icono
+            const icon = document.createElement("div");
+            icon.classList.add("estado-lectura-listado");
+            icon.classList.add(leida ? "estado-lectura-leido" : "estado-lectura-noleido");
+            icon.textContent = leida ? "✓" : "✘";
+
+            // Insertarlo dentro del recuadro de la actividad
+            const contenedor = act.querySelector(".activity-item");
+            contenedor.style.position = "relative";
+            contenedor.appendChild(icon);
+        });
+        return;
+    }
 
     /********************************************
      * 1. Obtener el ID de la actividad: ?id=1234
@@ -53,8 +98,8 @@
     style.innerHTML = `
         #leido-btn {
             position: fixed;
-            top: 20px;
-            right: 20px;
+            top: 10px;
+            right: 10px;
             border-radius: 50%;
             width: 55px;
             height: 55px;
@@ -145,6 +190,7 @@
         </button>
     `;
     document.body.appendChild(panel);
+    //document.getElementById("region-main").appendChild(panel);
 
     /********************************************
      * 6. Lógica de interacción
