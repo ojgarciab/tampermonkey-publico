@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         Moodle: Marcar Unidades como Leídas
 // @namespace    http://tampermonkey.net/
-// @version      2026-02-23.fix2
+// @version      2026-02-23.fix3
 // @description  Añade un panel para marcar como leída la unidad actual del curso Moodle guardando en localStorage.
 // @author       Óscar García
 // @match        https://lms.haz.institutortve.com/course/view.php*
 // @match        https://lms.haz.institutortve.com/mod/page/view.php*
+// @match        https://kaf.haz.institutortve.com/browseandembed/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=institutortve.com
 // @homepageURL  https://ojgarciab.github.io/tampermonkey-publico/
 // @supportURL   https://github.com/ojgarciab/tampermonkey-publico/issues
@@ -16,6 +17,93 @@
 
 (function () {
     'use strict';
+
+    /* Tratamos accesos al reproductor de vídeo */
+    if (
+        [
+            "kaf.haz.institutortve.com",
+        ].includes(window.location.hostname)
+    ) {
+        gestionarReproductor();
+    }
+
+    function gestionarReproductor() {
+        /* global kalturaPlayer */
+
+        // Espera a que el reproductor esté listo
+        kalturaPlayer.ready().then(() => {
+            const onLoadedMetadata = (ev) => {
+                try {
+                    const total = typeof kalturaPlayer.duration === "function"
+                    ? kalturaPlayer.duration()
+                    : kalturaPlayer.duration || 0;
+                    console.log("[Kaltura] Duración total (s):", total, "=>", formatTime(total));
+                    window.parent.postMessage({
+                        type: "reproductor_duracion",
+                        duración: total
+                    }, "*");
+                } catch (err) {
+                    console.error("[Kaltura] Error en LOADED_METADATA:", err);
+                }
+            };
+            kalturaPlayer.addEventListener(
+                kalturaPlayer.Event.LOADED_METADATA,
+                onLoadedMetadata
+            );
+
+            window.addEventListener("message", (event) => {
+                const data = event.data;
+                if (data && data.type === "kaltura_seek") {
+                    const newPosition = Number(data.position);
+                    if (!isNaN(newPosition)) {
+                        console.log("[Hijo] Cambiando posición a:", newPosition);
+                        kalturaPlayer.currentTime(newPosition);
+                    }
+                }
+            });
+
+            const onTimeUpdate = (ev) => {
+                try {
+                    // Algunos builds devuelven currentTime como número directo, otros como método
+                    const now = (typeof kalturaPlayer.currentTime === "function")
+                    ? kalturaPlayer.currentTime()
+                    : kalturaPlayer.currentTime || 0;
+
+                    if (typeof now !== "number" || isNaN(now)) return; // evita NaN
+                    console.log("[Kaltura] Tiempo actual (s):", now, "=>", formatTime(now));
+                    window.parent.postMessage({
+                        type: "reproductor_actual",
+                        duración: now
+                    }, "*");
+                } catch (err) {
+                    console.error("[Kaltura] Error en TIME_UPDATE:", err);
+                }
+            };
+
+            kalturaPlayer.addEventListener(
+                kalturaPlayer.Event.TIME_UPDATE,
+                onTimeUpdate
+            );
+
+            kalturaPlayer.addEventListener(
+                kalturaPlayer.Event.DURATION_CHANGED,
+                () => {
+                    try {
+                        const total = typeof kalturaPlayer.duration === "function"
+                        ? kalturaPlayer.duration()
+                        : kalturaPlayer.duration || 0;
+                        console.log("[Kaltura] Duración (actualizada) (s):", total, "=>", formatTime(total));
+                    window.parent.postMessage({
+                        type: "reproductor_duracion",
+                        duración: total
+                    }, "*");
+                    } catch (err) {
+                        console.error("[Kaltura] Error en DURATION_CHANGED:", err);
+                    }
+                }
+            );
+        });
+    }
 
     if (window.location.pathname.includes("/course/view.php")) {
         const styleListado = document.createElement("style");
@@ -216,5 +304,16 @@
         btn.classList.toggle("leido");
         btn.classList.toggle("noleido");
     });
+
+    // Helper: formateo mm:ss o hh:mm:ss
+    function formatTime(seconds) {
+        if (isNaN(seconds) || seconds == null) return "00:00";
+        seconds = Math.max(0, Math.floor(seconds));
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        const two = (n) => String(n).padStart(2, "0");
+        return h > 0 ? `${h}:${two(m)}:${two(s)}` : `${two(m)}:${two(s)}`;
+    }
 
 })();
