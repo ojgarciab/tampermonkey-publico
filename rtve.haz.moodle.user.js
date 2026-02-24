@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         Moodle: gestión de unidades leídas
 // @namespace    haz.institutortve.linaresdigital.com
-// @version      2026-02-24.fix0
+// @version      2026-02-24.r1
 // @description  Añade un panel para marcar como leída la unidad actual del curso Moodle guardando en almacenamiento de la extensión.
 // @author       Óscar García
 // @match        https://lms.haz.institutortve.com/course/view.php*
 // @match        https://lms.haz.institutortve.com/course/section.php*
 // @match        https://lms.haz.institutortve.com/mod/page/view.php*
-// @match        https://lms.haz.institutortve.com/mod/quiz/view.php*
+// @match        https://lms.haz.institutortve.com/mod/resource/view.php*
 // @match        https://kaf.haz.institutortve.com/browseandembed/*
 
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=institutortve.com
@@ -45,6 +45,7 @@
             [
                 "/mod/page/view.php",
                 "/mod/quiz/view.php",
+                "/mod/resource/view.php",
             ].includes(window.location.pathname)
         ) {
             gestionarActividad();
@@ -156,7 +157,6 @@
             }
         `;
         document.head.appendChild(styleListado);
-
         // Si navegamos hacia atrás o cambiamos de pestaña forzamos una actualización
         window.addEventListener("pageshow", dibujarListadoDeActividades);
         document.addEventListener("visibilitychange", dibujarListadoDeActividades);
@@ -393,15 +393,9 @@
             repTiempo.textContent = `${formatTime(p)} / ${formatTime(d)} (${porcentaje}%)`;
             repProgreso.style.width = d > 0 ? `${Math.min(100, (p / d) * 100)}%` : "0%";
         }
-
-        // Refresca UI si cambias de pestaña o navegas atrás (historial)
-        const onVisibilityOrPageShow = () => {
-            // Vuelve a leer localStorage y pinta
-            refrescarReproduccion();
-        };
-        document.addEventListener("visibilitychange", onVisibilityOrPageShow);
-        window.addEventListener("pageshow", onVisibilityOrPageShow);
-        window.addEventListener("popstate", onVisibilityOrPageShow);
+        document.addEventListener("visibilitychange", refrescarReproduccion);
+        window.addEventListener("pageshow", refrescarReproduccion);
+        window.addEventListener("popstate", refrescarReproduccion);
 
         // Pinta estado inicial
         refrescarReproduccion();
