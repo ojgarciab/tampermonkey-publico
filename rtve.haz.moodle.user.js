@@ -1,12 +1,13 @@
 // ==UserScript==
-// @name         Moodle: Marcar Unidades como Leídas
-// @namespace    http://tampermonkey.net/
-// @version      2026-02-23.fix7
-// @description  Añade un panel para marcar como leída la unidad actual del curso Moodle guardando en localStorage.
+// @name         Moodle: gestión de unidades leídas
+// @namespace    haz.institutortve.linaresdigital.com
+// @version      2026-02-24.fix0
+// @description  Añade un panel para marcar como leída la unidad actual del curso Moodle guardando en almacenamiento de la extensión.
 // @author       Óscar García
 // @match        https://lms.haz.institutortve.com/course/view.php*
 // @match        https://lms.haz.institutortve.com/course/section.php*
 // @match        https://lms.haz.institutortve.com/mod/page/view.php*
+// @match        https://lms.haz.institutortve.com/mod/quiz/view.php*
 // @match        https://kaf.haz.institutortve.com/browseandembed/*
 
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=institutortve.com
@@ -14,7 +15,8 @@
 // @supportURL   https://github.com/ojgarciab/tampermonkey-publico/issues
 // @downloadURL  https://ojgarciab.github.io/tampermonkey-publico/rtve.haz.moodle.user.js
 // @updateURL    https://ojgarciab.github.io/tampermonkey-publico/rtve.haz.moodle.user.js
-// @grant        none
+// @grant        GM_setValue
+// @grant        GM_getValue
 // ==/UserScript==
 
 (function () {
@@ -42,6 +44,7 @@
         } else if (
             [
                 "/mod/page/view.php",
+                "/mod/quiz/view.php",
             ].includes(window.location.pathname)
         ) {
             gestionarActividad();
@@ -54,22 +57,26 @@
         kalturaPlayer.ready().then(() => {
             // Al cargar los metadatos del vídeo comunicamos su duración y, en respuesta, posiblemente nos envíen de vuelta
             // la posición por la que tenemos que proseguir la reproducción
+            const comprobarTotal = (ev) => {
+                clearInterval(temporizadorTotal);
+                try {
+                    const total = typeof kalturaPlayer.duration === "function"
+                    ? kalturaPlayer.duration()
+                    : kalturaPlayer.duration || 0;
+                    console.log("[Kaltura] Duración total (s):", total, "=>", formatTime(total));
+                    window.parent.postMessage({
+                        tipo: "reproductor_duracion",
+                        duración: total
+                    }, "*");
+                } catch (err) {
+                    console.error("[Kaltura] Error en LOADED_METADATA:", err);
+                }
+            };
+
+            const temporizadorTotal = setTimeout(comprobarTotal, 500);
             kalturaPlayer.addEventListener(
                 kalturaPlayer.Event.LOADED_METADATA,
-                (ev) => {
-                    try {
-                        const total = typeof kalturaPlayer.duration === "function"
-                        ? kalturaPlayer.duration()
-                        : kalturaPlayer.duration || 0;
-                        console.log("[Kaltura] Duración total (s):", total, "=>", formatTime(total));
-                        window.parent.postMessage({
-                            tipo: "reproductor_duracion",
-                            duración: total
-                        }, "*");
-                    } catch (err) {
-                        console.error("[Kaltura] Error en LOADED_METADATA:", err);
-                    }
-                }
+                comprobarTotal
             );
             // Si nos llega un mensaje para cambiar el tiempo de la reproducción, lo procesamos
             window.addEventListener("message", (event) => {
@@ -166,7 +173,7 @@
             if (!id) return;
 
             const key = "moodleActividadLeida_" + id;
-            const leida = localStorage.getItem(key) === "true";
+            const leida = GM_getValue(key, false);
 
             // Dentro del contenedor donde posicionamos el icono
             const contenedor = act.querySelector(".activity-item");
@@ -195,7 +202,7 @@
         if (!actividadId) return;
 
         const storageKey = "moodleActividadLeida_" + actividadId;
-        let estadoLeido = localStorage.getItem(storageKey) === "true";
+        let estadoLeido = GM_getValue(storageKey, false);
 
         //2 Obtener información del breadcrumb
         const breadcrumbItems = document.querySelectorAll("#page-navbar .breadcrumb-item");
@@ -371,10 +378,10 @@
         const repProgreso = panel.querySelector("#rep-progreso");
 
         // Helpers de almacenamiento
-        const leerDuracion = () => parseInt(localStorage.getItem(durKey) || "0", 10);
-        const leerPosicion = () => parseInt(localStorage.getItem(posKey) || "0", 10);
-        const guardarDuracion = (total) => localStorage.setItem(durKey, String(Math.max(0, Math.round(total || 0))));
-        const guardarPosicion = (pos) => localStorage.setItem(posKey, String(Math.max(0, Math.round(pos || 0))));
+        const leerDuracion = () => parseInt(GM_getValue(durKey) || "0", 10);
+        const leerPosicion = () => parseInt(GM_getValue(posKey) || "0", 10);
+        const guardarDuracion = (total) => GM_setValue(durKey, String(Math.max(0, Math.round(total || 0))));
+        const guardarPosicion = (pos) => GM_setValue(posKey, String(Math.max(0, Math.round(pos || 0))));
 
         // Refresca la representación del estado de reproducción en el panel
         function refrescarReproduccion() {
@@ -401,7 +408,7 @@
 
         btnMarcar.addEventListener("click", () => {
             estadoLeido = !estadoLeido;
-            localStorage.setItem(storageKey, estadoLeido);
+            GM_setValue(storageKey, estadoLeido);
 
             // Panel
             estadoTexto.textContent = estadoLeido ? "Leída ✔" : "No leída ✘";
