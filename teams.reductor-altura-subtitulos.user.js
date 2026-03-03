@@ -1,11 +1,13 @@
 // ==UserScript==
 // @name         Reductor de la altura de la barra de subtítulos de Teams
 // @namespace    https://github.com/ojgarciab
-// @version      0.3
+// @version      0.4
 // @description  try to take over the world!
 // @author       Óscar García
 // @match        https://teams.microsoft.com/v2/*
 // @match        https://teams.microsoft.com/l/meetup-join/*
+// @match        https://teams.cloud.microsoft/v2/*
+// @match        https://teams.cloud.microsoft/l/meetup-join/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=microsoft.com
 // @homepageURL  https://ojgarciab.github.io/tampermonkey-publico/
 // @supportURL   https://github.com/ojgarciab/tampermonkey-publico/issues
