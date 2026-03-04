@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Moodle: gestión de unidades leídas
 // @namespace    haz.institutortve.linaresdigital.com
-// @version      2026-02-24.r3
+// @version      2026-03-04.r0
 // @description  Añade un panel para marcar como leída la unidad actual del curso Moodle guardando en almacenamiento de la extensión.
 // @author       Óscar García
 // @match        https://lms.haz.institutortve.com/course/view.php*
@@ -158,6 +158,9 @@
             .estado-lectura-noleido {
                 color: #b00000;
             }
+            .estado-lectura-parcial {
+                color: orange;
+            }
         `;
         document.head.appendChild(styleListado);
         // Si navegamos hacia atrás o cambiamos de pestaña forzamos una actualización
@@ -178,6 +181,15 @@
             const key = "moodleActividadLeida_" + id;
             const leida = GM_getValue(key, false);
 
+            // Claves de reproducción
+            const durKey = `~dur_${id}`;
+            const posKey = `~pos_${id}`;
+            const dur = parseInt(GM_getValue(durKey) || "0", 10);
+            const pos = parseInt(GM_getValue(posKey) || "0", 10);
+
+            // Actividad parcialmente reproducida si:
+            const parcial = !leida && pos > 5;
+
             // Dentro del contenedor donde posicionamos el icono
             const contenedor = act.querySelector(".activity-item");
             if (!contenedor) return;
@@ -192,9 +204,17 @@
             }
 
             // Actualizamos clases y contenido (idempotente)
-            icon.classList.toggle("estado-lectura-leido", leida);
-            icon.classList.toggle("estado-lectura-noleido", !leida);
-            icon.textContent = leida ? "✓" : "✘";
+            icon.classList.remove("estado-lectura-leido", "estado-lectura-noleido", "estado-lectura-parcial");
+            if (leida) {
+                icon.classList.add("estado-lectura-leido");
+                icon.textContent = "✓";
+            } else if (parcial) {
+                icon.classList.add("estado-lectura-parcial");
+                icon.textContent = "⏳";
+            } else {
+                icon.classList.add("estado-lectura-noleido");
+                icon.textContent = "✘";
+            }
         });
     }
 
@@ -247,6 +267,9 @@
             }
             #leido-btn.leido {
                 background: #0a8a0a; color: white;
+            }
+            #leido-btn.parcial {
+                background: orange; color: white;
             }
             #leido-btn.noleido {
                 background: #b00000; color: white;
@@ -413,9 +436,20 @@
             btnMarcar.classList.toggle("no");
 
             // Botón flotante
-            btn.textContent = estadoLeido ? "✓" : "✘";
+            btn.classList.remove("leido", "noleido", "parcial");
+            if (estadoLeido) {
+                btn.classList.add("leido");
+                btn.textContent = "✓";
+            } else if (leerPosicion() > 5) {
+                btn.classList.add("parcial");
+                btn.textContent = "⏳";
+            } else {
+                btn.classList.add("noleido");
+                btn.textContent = "✘";
+            }
+            /*btn.textContent = estadoLeido ? "✓" : "✘";
             btn.classList.toggle("leido");
-            btn.classList.toggle("noleido");
+            btn.classList.toggle("noleido");*/
         });
 
         window.addEventListener("message", (event) => {
