@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Moodle: gestión de unidades leídas
 // @namespace    haz.institutortve.linaresdigital.com
-// @version      2026-03-04.r0
+// @version      2026-04-06.r0
 // @description  Añade un panel para marcar como leída la unidad actual del curso Moodle guardando en almacenamiento de la extensión.
 // @author       Óscar García
 // @match        https://lms.haz.institutortve.com/course/view.php*
@@ -10,6 +10,7 @@
 // @match        https://lms.haz.institutortve.com/mod/quiz/view.php*
 // @match        https://lms.haz.institutortve.com/mod/resource/view.php*
 // @match        https://lms.haz.institutortve.com/mod/scorm/view.php*
+// @match        https://lms.haz.institutortve.com/mod/questionnaire/view.php*
 // @match        https://kaf.haz.institutortve.com/browseandembed/*
 
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=institutortve.com
@@ -49,6 +50,7 @@
                 "/mod/quiz/view.php",
                 "/mod/resource/view.php",
                 "/mod/scorm/view.php",
+                "/mod/questionnaire/view.php",
             ].includes(window.location.pathname)
         ) {
             gestionarActividad();
